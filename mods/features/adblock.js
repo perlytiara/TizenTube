@@ -5,6 +5,75 @@ import { timelyAction, longPressData, MenuServiceItemRenderer, ShelfRenderer, Ti
 import { PatchSettings } from '../ui/customYTSettings.js';
 import { t } from 'i18next';
 
+const AD_PAYLOAD_KEYS = [
+  'adPlacements',
+  'adSlots',
+  'playerAds',
+  'adBreakHeartbeatParams',
+];
+
+function isAdEntry(value) {
+  if (!value || typeof value !== 'object') return false;
+  if (value.adSlotRenderer) return true;
+  if (value.command?.reelWatchEndpoint?.adClientParams?.isAd) return true;
+  if (value.reelWatchEndpoint?.adClientParams?.isAd) return true;
+  if (value.adClientParams?.isAd) return true;
+  if (value.richItemRenderer?.content?.adSlotRenderer) return true;
+  return false;
+}
+
+function sanitizeAdPayload(root) {
+  if (!root || typeof root !== 'object') return root;
+
+  const stack = [root];
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (!node || typeof node !== 'object') continue;
+
+    if (Array.isArray(node)) {
+      for (let i = node.length - 1; i >= 0; i--) {
+        if (isAdEntry(node[i])) {
+          node.splice(i, 1);
+          continue;
+        }
+        if (node[i] && typeof node[i] === 'object') stack.push(node[i]);
+      }
+      continue;
+    }
+
+    for (const key of AD_PAYLOAD_KEYS) {
+      if (!(key in node)) continue;
+      if (key === 'playerAds') {
+        node[key] = false;
+      } else {
+        node[key] = [];
+      }
+    }
+
+    for (const key of Object.keys(node)) {
+      const value = node[key];
+      if (!value || typeof value !== 'object') continue;
+      if (isAdEntry(value)) {
+        node[key] = Array.isArray(value) ? [] : null;
+        continue;
+      }
+      stack.push(value);
+    }
+  }
+
+  return root;
+}
+
+const origResponseJson = globalThis.Response?.prototype?.json;
+if (origResponseJson) {
+  globalThis.Response.prototype.json = function (...args) {
+    return origResponseJson.apply(this, args).then((data) => {
+      if (!configRead('enableAdBlock')) return data;
+      return sanitizeAdPayload(data);
+    });
+  };
+}
+
 /**
  * This is a minimal reimplementation of the following uBlock Origin rule:
  * https://github.com/uBlockOrigin/uAssets/blob/3497eebd440f4871830b9b45af0afc406c6eb593/filters/filters.txt#L116
@@ -19,6 +88,10 @@ JSON.parse = function () {
   const r = origParse.apply(this, arguments);
   const adBlockEnabled = configRead('enableAdBlock');
   const signinReminderEnabled = configRead('enableSigninReminder');
+
+  if (adBlockEnabled) {
+    sanitizeAdPayload(r);
+  }
 
   if (r.adPlacements && adBlockEnabled) {
     r.adPlacements = [];
