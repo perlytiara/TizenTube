@@ -22,7 +22,11 @@
     "MediaFastForward",
     "MediaRewind",
     "MediaTrackNext",
-    "MediaTrackPrevious"
+    "MediaTrackPrevious",
+    "ColorF0Red",
+    "ColorF1Green",
+    "ColorF2Yellow",
+    "ColorF3Blue"
   ],
   "repository": {
     "type": "git",

@@ -1,6 +1,14 @@
 import { configRead } from '../config.js';
 import { showModal, buttonItem, overlayPanelItemListRenderer } from './ytUI.js';
 
+const BLUE_KEY_CODES = new Set([406, 191]);
+
+function isBlueKey(evt) {
+    if (BLUE_KEY_CODES.has(evt?.keyCode)) return true;
+    const key = (evt?.key || '').toLowerCase();
+    return key.includes('colorf3') || key.includes('blue');
+}
+
 const interval = setInterval(() => {
     const videoElement = document.querySelector('video');
     if (videoElement) {
@@ -15,7 +23,7 @@ function execute_once_dom_loaded_speed() {
     });
 
     const eventHandler = (evt) => {
-        if (evt.keyCode == 406 || evt.keyCode == 191) {
+        if (isBlueKey(evt)) {
             evt.preventDefault();
             evt.stopPropagation();
             if (evt.type === 'keydown') {

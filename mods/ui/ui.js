@@ -21,6 +21,19 @@ const interval = setInterval(() => {
 }, 250);
 
 let keyTimeout = null;
+const COLOR_KEYS = {
+  RED: new Set([403, 172]),
+  GREEN: new Set([404, 170]),
+  YELLOW: new Set([405]),
+  BLUE: new Set([406, 191]),
+};
+
+function isColorKey(evt, color) {
+  const keyCode = evt?.keyCode;
+  if (COLOR_KEYS[color]?.has(keyCode)) return true;
+  const key = (evt?.key || '').toLowerCase();
+  return key.includes(`colorf${{ RED: 0, GREEN: 1, YELLOW: 2, BLUE: 3 }[color]}`) || key.includes(color.toLowerCase());
+}
 
 function execute_once_dom_loaded() {
 
@@ -149,7 +162,7 @@ function execute_once_dom_loaded() {
         document.getElementById('container').style.setProperty('opacity', (1 - configRead('dimmingOpacity')).toString(), 'important');
       }, configRead('dimmingTimeout') * 1000);
     }
-    if (evt.keyCode == 403) {
+    if (isColorKey(evt, 'RED')) {
       console.info('Taking over!');
       evt.preventDefault();
       evt.stopPropagation();
@@ -167,9 +180,15 @@ function execute_once_dom_loaded() {
         } catch (e) { }
       }
       return false;
-    } else if (evt.keyCode == 404) {
+    } else if (isColorKey(evt, 'GREEN')) {
       if (evt.type === 'keydown') {
         modernUI();
+      }
+    } else if (isColorKey(evt, 'BLUE')) {
+      evt.preventDefault();
+      evt.stopPropagation();
+      if (evt.type === 'keydown') {
+        speedSettings();
       }
     } else if (evt.keyCode == 39) {
       // Right key, for PiP
