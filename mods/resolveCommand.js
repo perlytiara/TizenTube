@@ -77,6 +77,25 @@ export function patchResolveCommand() {
                 } else if (cmd?.openPopupAction?.uniqueId === 'playback-settings') {
                     // Patch the playback settings popup to use TizenTube speed settings
                     const items = cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items;
+                    const hasTizenTubeSettings = items.some(item =>
+                        item?.compactLinkRenderer?.serviceEndpoint?.signalAction?.customAction?.action === 'TT_SETTINGS_SHOW'
+                    );
+                    if (!hasTizenTubeSettings) {
+                        items.splice(0, 0,
+                            buttonItem(
+                                { title: 'TizenTube Settings' },
+                                { icon: 'SETTINGS' }, [
+                                {
+                                    signalAction: {
+                                        customAction: {
+                                            action: 'TT_SETTINGS_SHOW',
+                                            parameters: []
+                                        }
+                                    }
+                                }
+                            ])
+                        );
+                    }
                     for (const item of items) {
                         if (item?.compactLinkRenderer?.icon?.iconType === 'SLOW_MOTION_VIDEO') {
                             item.compactLinkRenderer.subtitle && (item.compactLinkRenderer.subtitle.simpleText = 'with TizenTube');

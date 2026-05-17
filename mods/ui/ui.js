@@ -27,15 +27,33 @@ const COLOR_KEYS = {
   YELLOW: new Set([405, 114]),
   BLUE: new Set([406, 191, 115]),
 };
+const COLOR_KEY_NAMES = {
+  RED: ['colorf0red', 'colorf0', 'red'],
+  GREEN: ['colorf1green', 'colorf1', 'green'],
+  YELLOW: ['colorf2yellow', 'colorf2', 'yellow'],
+  BLUE: ['colorf3blue', 'colorf3', 'blue'],
+};
+
+function registerRemoteColorKeys() {
+  try {
+    if (!window.tizen?.tvinputdevice?.registerKey) return;
+    window.tizen.tvinputdevice.registerKey('ColorF0Red');
+    window.tizen.tvinputdevice.registerKey('ColorF1Green');
+    window.tizen.tvinputdevice.registerKey('ColorF2Yellow');
+    window.tizen.tvinputdevice.registerKey('ColorF3Blue');
+  } catch (_) { }
+}
 
 function isColorKey(evt, color) {
   const keyCode = evt?.keyCode;
   if (COLOR_KEYS[color]?.has(keyCode)) return true;
   const key = (evt?.key || '').toLowerCase();
+  const keyIdentifier = (evt?.keyIdentifier || '').toLowerCase();
   const code = (evt?.code || '').toLowerCase();
   const index = { RED: 0, GREEN: 1, YELLOW: 2, BLUE: 3 }[color];
-  return key.includes(`colorf${index}`) ||
-    key.includes(color.toLowerCase()) ||
+  const names = COLOR_KEY_NAMES[color] || [];
+  return names.some((name) => key.includes(name) || keyIdentifier.includes(name)) ||
+    key.includes(`colorf${index}`) ||
     code === `f${index + 1}` ||
     code.includes(`colorf${index}`);
 }
@@ -49,6 +67,7 @@ function setSpatialNavigationKeyMode() {
 }
 
 function execute_once_dom_loaded() {
+  registerRemoteColorKeys();
 
   // Add CSS to head.
 
@@ -228,6 +247,9 @@ function execute_once_dom_loaded() {
   document.addEventListener('keydown', eventHandler, true);
   document.addEventListener('keypress', eventHandler, true);
   document.addEventListener('keyup', eventHandler, true);
+  window.addEventListener('keydown', eventHandler, true);
+  window.addEventListener('keypress', eventHandler, true);
+  window.addEventListener('keyup', eventHandler, true);
   if (configRead('showWelcomeToast')) {
     setTimeout(() => {
       showToast(t('welcomeMsg.title'), t('welcomeMsg.subtitle'));
