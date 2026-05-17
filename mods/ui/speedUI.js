@@ -10,17 +10,25 @@ function isBlueKey(evt) {
 }
 
 const interval = setInterval(() => {
-    const videoElement = document.querySelector('video');
-    if (videoElement) {
-        execute_once_dom_loaded_speed();
-        clearInterval(interval);
-    }
+    if (!document.body || window.__ttSpeedUiInitialized) return;
+    window.__ttSpeedUiInitialized = true;
+    execute_once_dom_loaded_speed();
+    clearInterval(interval);
 }, 1000);
 
 function execute_once_dom_loaded_speed() {
-    document.querySelector('video').addEventListener('canplay', () => {
-        document.getElementsByTagName('video')[0].playbackRate = configRead('videoSpeed');;
-    });
+    const applyConfiguredSpeed = () => {
+        const video = document.querySelector('video');
+        if (!video) return;
+        video.playbackRate = configRead('videoSpeed');
+    };
+
+    document.addEventListener('canplay', (evt) => {
+        if (evt?.target?.tagName === 'VIDEO') {
+            applyConfiguredSpeed();
+        }
+    }, true);
+    applyConfiguredSpeed();
 
     const eventHandler = (evt) => {
         if (isBlueKey(evt)) {

@@ -7,17 +7,17 @@ import { showToast } from './ytUI.js';
 import modernUI from './settings.js';
 import resolveCommand, { patchResolveCommand } from '../resolveCommand.js';
 import { pipToFullscreen } from '../features/pictureInPicture.js';
+import { speedSettings } from './speedUI.js';
 import getCommandExecutor from './customCommandExecution.js';
 import { t } from 'i18next';
 
-// It just works, okay?
+// Initialize as soon as app DOM is ready (no need to wait for a video).
 const interval = setInterval(() => {
-  const videoElement = document.querySelector('video');
-  if (videoElement) {
-    execute_once_dom_loaded();
-    patchResolveCommand();
-    clearInterval(interval);
-  }
+  if (!document.body || window.__ttUiInitialized) return;
+  window.__ttUiInitialized = true;
+  execute_once_dom_loaded();
+  patchResolveCommand();
+  clearInterval(interval);
 }, 250);
 
 let keyTimeout = null;
