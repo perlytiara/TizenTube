@@ -22,17 +22,30 @@ const interval = setInterval(() => {
 
 let keyTimeout = null;
 const COLOR_KEYS = {
-  RED: new Set([403, 172]),
-  GREEN: new Set([404, 170]),
-  YELLOW: new Set([405]),
-  BLUE: new Set([406, 191]),
+  RED: new Set([403, 172, 112]),
+  GREEN: new Set([404, 170, 113]),
+  YELLOW: new Set([405, 114]),
+  BLUE: new Set([406, 191, 115]),
 };
 
 function isColorKey(evt, color) {
   const keyCode = evt?.keyCode;
   if (COLOR_KEYS[color]?.has(keyCode)) return true;
   const key = (evt?.key || '').toLowerCase();
-  return key.includes(`colorf${{ RED: 0, GREEN: 1, YELLOW: 2, BLUE: 3 }[color]}`) || key.includes(color.toLowerCase());
+  const code = (evt?.code || '').toLowerCase();
+  const index = { RED: 0, GREEN: 1, YELLOW: 2, BLUE: 3 }[color];
+  return key.includes(`colorf${index}`) ||
+    key.includes(color.toLowerCase()) ||
+    code === `f${index + 1}` ||
+    code.includes(`colorf${index}`);
+}
+
+function setSpatialNavigationKeyMode() {
+  if (window.__spatialNavigation__) {
+    window.__spatialNavigation__.keyMode = 'NONE';
+    return true;
+  }
+  return false;
 }
 
 function execute_once_dom_loaded() {
@@ -61,7 +74,13 @@ function execute_once_dom_loaded() {
   }
 
   // We handle key events ourselves.
-  window.__spatialNavigation__.keyMode = 'NONE';
+  if (!setSpatialNavigationKeyMode()) {
+    const navInterval = setInterval(() => {
+      if (setSpatialNavigationKeyMode()) {
+        clearInterval(navInterval);
+      }
+    }, 250);
+  }
 
   var ARROW_KEY_CODE = { 37: 'left', 38: 'up', 39: 'right', 40: 'down' };
 

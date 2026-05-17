@@ -1,12 +1,13 @@
 import { configRead } from '../config.js';
 import { showModal, buttonItem, overlayPanelItemListRenderer } from './ytUI.js';
 
-const BLUE_KEY_CODES = new Set([406, 191]);
+const BLUE_KEY_CODES = new Set([406, 191, 115]);
 
 function isBlueKey(evt) {
     if (BLUE_KEY_CODES.has(evt?.keyCode)) return true;
     const key = (evt?.key || '').toLowerCase();
-    return key.includes('colorf3') || key.includes('blue');
+    const code = (evt?.code || '').toLowerCase();
+    return key.includes('colorf3') || key.includes('blue') || code === 'f4' || code.includes('colorf3');
 }
 
 const interval = setInterval(() => {
