@@ -1,11 +1,17 @@
 {
-  "name": "@foxreis/tizentube",
+  "name": "@perlytiara/tizentube",
   "appName": "TizenTube",
-  "version": "1.14.1",
+  "version": "1.14.2-0",
   "description": "TizenTube is an ad-free and sponsor-free solution for your favourite streaming website on your Tizen (Samsung) TVs.",
   "packageType": "mods",
   "websiteURL": "https://youtube.com/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A8085%2Fdial%2Fapps%2FYouTube",
   "main": "dist/userScript.js",
+  "scripts": {
+    "build:mods": "npm --prefix mods ci && npm --prefix mods run build",
+    "build:service": "npm --prefix service ci && cd service && npx rollup -c rollup.config.js",
+    "build": "npm run build:mods && npm run build:service",
+    "prepublishOnly": "npm run build"
+  },
   "author": "Reis Can",
   "serviceFile": "dist/service.js",
   "keys": [
@@ -19,7 +25,11 @@
     "MediaTrackPrevious"
   ],
   "repository": {
-    "url": "https://github.com/reisxd/TizenTube"
+    "type": "git",
+    "url": "https://github.com/perlytiara/TizenTube.git"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "license": "GPL-3.0-only"
 }
