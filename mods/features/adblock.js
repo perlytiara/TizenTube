@@ -11,6 +11,128 @@ const AD_PAYLOAD_KEYS = [
   'playerAds',
   'adBreakHeartbeatParams',
 ];
+const AD_URL_PATTERNS = [
+  'doubleclick.net',
+  'googleadservices.com',
+  '/api/stats/ads',
+  '/pagead/',
+  'youtubei/v1/ad',
+  '/get_midroll_info',
+  '/get_video_info?adformat=',
+];
+const AD_KEY_PATTERN = /(^|_)(ad|ads)(_|$)|adbreak|adstate|adplacement|adslot|playerads|adshowing|adplaying|isad/i;
+const AD_KEY_EXCLUDE_PATTERN = /adaptiveformats|adapter|shadow/i;
+const AD_SKIP_BUTTON_SELECTORS = [
+  '.ytp-ad-skip-button',
+  '.ytp-ad-skip-button-modern',
+  '.ytp-skip-ad-button',
+  '[class*="skip-ad"]',
+  '[class*="ad-skip"]',
+  '[id*="skip-ad"]',
+  '[aria-label*="Skip"]',
+  '[aria-label*="skip"]',
+];
+
+function isAdUrl(url) {
+  if (typeof url !== 'string' || !url) return false;
+  const normalized = url.toLowerCase();
+  return AD_URL_PATTERNS.some((pattern) => normalized.includes(pattern));
+}
+
+function hasLikelyAdState(input, depth = 0) {
+  if (!input || typeof input !== 'object' || depth > 5) return false;
+  if (Array.isArray(input)) {
+    return input.some((entry) => hasLikelyAdState(entry, depth + 1));
+  }
+
+  for (const key of Object.keys(input)) {
+    if (AD_KEY_EXCLUDE_PATTERN.test(key)) continue;
+    const value = input[key];
+    if (AD_KEY_PATTERN.test(key)) {
+      if (value === true) return true;
+      if (typeof value === 'number' && value > 0) return true;
+      if (typeof value === 'string' && value.length > 0 && value !== 'false' && value !== '0') return true;
+      if (Array.isArray(value) && value.length > 0) return true;
+      if (value && typeof value === 'object' && Object.keys(value).length > 0) return true;
+    }
+    if (value && typeof value === 'object' && hasLikelyAdState(value, depth + 1)) return true;
+  }
+
+  return false;
+}
+
+function clickAdSkipButtons() {
+  for (const selector of AD_SKIP_BUTTON_SELECTORS) {
+    const button = document.querySelector(selector);
+    if (button && typeof button.click === 'function') {
+      button.click();
+      return true;
+    }
+  }
+  return false;
+}
+
+function skipVideoToEnd(video) {
+  if (!video || !Number.isFinite(video.duration) || video.duration <= 1) return false;
+  const targetTime = Math.max(video.duration - 0.25, video.currentTime);
+  if (targetTime > video.currentTime) {
+    video.currentTime = targetTime;
+    return true;
+  }
+  return false;
+}
+
+function installNetworkAdBlockers() {
+  if (window.__ttAdFetchPatched) return;
+  window.__ttAdFetchPatched = true;
+
+  const originalFetch = window.fetch;
+  window.fetch = function (input, init) {
+    if (!configRead('enableAdBlock')) return originalFetch.call(this, input, init);
+
+    const url = typeof input === 'string' ? input : input?.url;
+    if (isAdUrl(url)) {
+      return Promise.resolve(new Response('', { status: 204, statusText: 'No Content' }));
+    }
+    return originalFetch.call(this, input, init);
+  };
+
+  const originalOpen = XMLHttpRequest.prototype.open;
+  const originalSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+    this.__ttRequestUrl = url;
+    return originalOpen.call(this, method, url, ...rest);
+  };
+  XMLHttpRequest.prototype.send = function (...args) {
+    if (configRead('enableAdBlock') && isAdUrl(this.__ttRequestUrl)) {
+      this.abort();
+      return;
+    }
+    return originalSend.call(this, ...args);
+  };
+}
+
+function installRuntimeAdKiller() {
+  if (window.__ttRuntimeAdKillerInstalled) return;
+  window.__ttRuntimeAdKillerInstalled = true;
+
+  setInterval(() => {
+    if (!configRead('enableAdBlock')) return;
+
+    const player = document.querySelector('.html5-video-player');
+    const video = document.querySelector('video');
+    if (!player || !video) return;
+
+    const playerState = typeof player.getPlayerStateObject === 'function' ? player.getPlayerStateObject() : null;
+    const classHasAd = player.classList?.contains('ad-showing') || player.classList?.contains('ad-interrupting');
+    const adDetected = classHasAd || hasLikelyAdState(playerState);
+
+    if (!adDetected) return;
+
+    if (clickAdSkipButtons()) return;
+    skipVideoToEnd(video);
+  }, 350);
+}
 
 function isAdEntry(value) {
   if (!value || typeof value !== 'object') return false;
@@ -73,6 +195,9 @@ if (origResponseJson) {
     });
   };
 }
+
+installNetworkAdBlockers();
+installRuntimeAdKiller();
 
 /**
  * This is a minimal reimplementation of the following uBlock Origin rule:
