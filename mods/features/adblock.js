@@ -26,11 +26,24 @@ const AD_SKIP_BUTTON_SELECTORS = [
   '.ytp-ad-skip-button',
   '.ytp-ad-skip-button-modern',
   '.ytp-skip-ad-button',
+  '.ytlr-ad-skip-button',
+  '.ytlr-skip-ad-button',
+  '.video-ads .ytp-button',
   '[class*="skip-ad"]',
   '[class*="ad-skip"]',
   '[id*="skip-ad"]',
   '[aria-label*="Skip"]',
   '[aria-label*="skip"]',
+];
+const AD_UI_SELECTORS = [
+  '.ad-showing',
+  '.ad-interrupting',
+  '.video-ads',
+  '.ytp-ad-player-overlay',
+  '.ytp-ad-text',
+  '[class*="ad-overlay"]',
+  '[class*="ad-container"]',
+  '[class*="ytlr-ad"]',
 ];
 
 function isAdUrl(url) {
@@ -63,8 +76,13 @@ function hasLikelyAdState(input, depth = 0) {
 
 function clickAdSkipButtons() {
   for (const selector of AD_SKIP_BUTTON_SELECTORS) {
-    const button = document.querySelector(selector);
-    if (button && typeof button.click === 'function') {
+    const buttons = document.querySelectorAll(selector);
+    for (const button of buttons) {
+      if (!button || typeof button.click !== 'function') continue;
+      const text = (button.textContent || '').toLowerCase().trim();
+      const label = (button.getAttribute?.('aria-label') || '').toLowerCase();
+      const maySkip = text.includes('skip') || label.includes('skip') || text.includes('ignore') || label.includes('ignore');
+      if (!maySkip && selector.includes('ytp-button')) continue;
       button.click();
       return true;
     }
@@ -79,6 +97,18 @@ function skipVideoToEnd(video) {
     video.currentTime = targetTime;
     return true;
   }
+  return false;
+}
+
+function isAdUiVisible() {
+  for (const selector of AD_UI_SELECTORS) {
+    const element = document.querySelector(selector);
+    if (!element) continue;
+    if (!element.classList || !element.classList.contains('hidden')) return true;
+  }
+
+  const text = (document.body?.innerText || '').toLowerCase();
+  if (text.includes('visit advertiser') || text.includes('learn more')) return true;
   return false;
 }
 
@@ -115,6 +145,11 @@ function installNetworkAdBlockers() {
 function installRuntimeAdKiller() {
   if (window.__ttRuntimeAdKillerInstalled) return;
   window.__ttRuntimeAdKillerInstalled = true;
+  const adSessionState = {
+    inAdSession: false,
+    originalPlaybackRate: 1,
+    originalMuted: false,
+  };
 
   setInterval(() => {
     if (!configRead('enableAdBlock')) return;
@@ -125,11 +160,39 @@ function installRuntimeAdKiller() {
 
     const playerState = typeof player.getPlayerStateObject === 'function' ? player.getPlayerStateObject() : null;
     const classHasAd = player.classList?.contains('ad-showing') || player.classList?.contains('ad-interrupting');
-    const adDetected = classHasAd || hasLikelyAdState(playerState);
+    const adDetected = classHasAd || hasLikelyAdState(playerState) || isAdUiVisible();
 
-    if (!adDetected) return;
+    if (!adDetected) {
+      if (adSessionState.inAdSession) {
+        adSessionState.inAdSession = false;
+        try {
+          if (Number.isFinite(adSessionState.originalPlaybackRate) && adSessionState.originalPlaybackRate > 0) {
+            video.playbackRate = adSessionState.originalPlaybackRate;
+          } else {
+            video.playbackRate = 1;
+          }
+          video.muted = adSessionState.originalMuted;
+        } catch (_) { }
+      }
+      return;
+    }
+
+    if (!adSessionState.inAdSession) {
+      adSessionState.inAdSession = true;
+      adSessionState.originalPlaybackRate = video.playbackRate || 1;
+      adSessionState.originalMuted = !!video.muted;
+    }
 
     if (clickAdSkipButtons()) return;
+
+    // If ad is unskippable, make it effectively pass faster and silently.
+    try {
+      video.muted = true;
+      if (video.playbackRate < 8) {
+        video.playbackRate = 16;
+      }
+    } catch (_) { }
+
     skipVideoToEnd(video);
   }, 350);
 }
